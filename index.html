@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>運行記録</title>
+<style>
+  :root {
+    --bg: #f3f5f8; --card: #fff; --ink: #1c2430; --sub: #5d6878; --line: #dde2ea;
+    --main: #1f4e79; --go: #1d7a46; --arrive: #b5651d; --end: #a8323e; --soft: #e8eef6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11161d; --card: #1a212b; --ink: #e8edf3; --sub: #9aa6b5; --line: #2c3644;
+      --main: #6fa8dc; --go: #4fbf7f; --arrive: #e09a55; --end: #e2707b; --soft: #233042; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; font-size: 17px; line-height: 1.5; }
+  header { background: var(--main); color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  @media (prefers-color-scheme: dark) { header { color: #11161d; } }
+  header h1 { margin: 0; font-size: 19px; }
+  header button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 4px 10px; font-size: 14px; }
+  main { max-width: 560px; margin: 0 auto; padding: 14px 16px 40px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+  .label { font-size: 13px; color: var(--sub); }
+  .state-title { font-size: 20px; font-weight: 700; margin: 2px 0 4px; }
+  .km { font-variant-numeric: tabular-nums; }
+  #mic { display: block; width: 100%; border: 0; border-radius: 18px; padding: 26px 10px; font-size: 22px; font-weight: 700;
+    background: var(--main); color: #fff; }
+  @media (prefers-color-scheme: dark) { #mic { color: #11161d; } }
+  #mic.listening { background: var(--end); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .75; } }
+  .hint { font-size: 13px; color: var(--sub); margin: 8px 2px 0; }
+  #heard { min-height: 1.5em; margin-top: 10px; font-size: 16px; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 12px 6px; font-size: 16px; font-weight: 600; }
+  .btn.go { border-color: var(--go); color: var(--go); }
+  .btn.arrive { border-color: var(--arrive); color: var(--arrive); }
+  .btn.end { border-color: var(--end); color: var(--end); }
+  .btn.primary { background: var(--main); color: #fff; border-color: var(--main); }
+  @media (prefers-color-scheme: dark) { .btn.primary { color: #11161d; } }
+  form label { display: block; font-size: 13px; color: var(--sub); margin-top: 10px; }
+  input, select { width: 100%; font-size: 17px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--bg); color: var(--ink); }
+  .seg { display: flex; gap: 8px; }
+  .seg label { flex: 1; margin: 0; }
+  .seg input { display: none; }
+  .seg span { display: block; text-align: center; padding: 9px; border: 1px solid var(--line); border-radius: 10px; font-size: 16px; color: var(--ink); }
+  .seg input:checked + span { background: var(--main); border-color: var(--main); color: #fff; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; }
+  .actions .btn { flex: 1; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: 18px; max-width: 528px; margin: 0 auto; background: var(--ink); color: var(--bg);
+    padding: 12px 14px; border-radius: 12px; display: none; align-items: center; gap: 10px; }
+  #toast.show { display: flex; }
+  #toast span { flex: 1; }
+  #toast button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; padding: 4px 10px; }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  .list li:first-child { border-top: 0; }
+  .tag { display: inline-block; font-size: 12px; border-radius: 6px; padding: 0 6px; margin-right: 4px; color: #fff; }
+  .t-出発 { background: var(--go); } .t-到着 { background: var(--arrive); } .t-終了 { background: var(--end); }
+  @media (prefers-color-scheme: dark) { .tag { color: #11161d; } }
+  .sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+  .sum b { display: block; font-size: 20px; }
+  .muted { color: var(--sub); font-size: 14px; }
+  .pending { color: var(--end); font-size: 13px; }
+  .list li.tap { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .list li.tap > div { flex: 1; min-width: 0; }
+  .list li.tap::after { content: '修正 ›'; color: var(--main); font-size: 13px; white-space: nowrap; }
+  .list li.trip::after { content: '詳細 ›'; }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .month-nav b { font-size: 19px; }
+  .month-nav button { width: 44px; padding: 6px 0; }
+  .sub-title { font-size: 13px; color: var(--sub); margin: 14px 0 4px; }
+  .breakdown { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .breakdown td { padding: 4px 0; border-top: 1px solid var(--line); }
+  .breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>運行記録</h1>
+  <button id="openSettings" type="button">設定</button>
+</header>
+<main>
+  <section class="card" id="stateCard">
+    <div class="label">いまの状態</div>
+    <div class="state-title" id="stateTitle">待機中</div>
+    <div class="muted" id="stateDetail">出発するときにマイクを押して話してください</div>
+  </section>
+
+  <section class="card">
+    <button id="mic" type="button">🎤 押して話す</button>
+    <p class="hint" id="micHint">例：「六甲アイランドへ出発します。私用です。買い物です。今のキロ数は2145です」<br>「到着しました。2152キロ」／「終了。今のキロ数は2160です」</p>
+    <div id="heard"></div>
+  </section>
+
+  <section class="card">
+    <div class="label" style="margin-bottom:8px">手で入力する</div>
+    <div class="row3">
+      <button class="btn go" type="button" data-manual="出発">出発</button>
+      <button class="btn arrive" type="button" data-manual="到着">到着</button>
+      <button class="btn end" type="button" data-manual="終了">終了</button>
+    </div>
+  </section>
+
+  <section class="card" id="formCard" hidden>
+    <div class="state-title" id="formTitle">確認</div>
+    <form id="form">
+      <label>種類</label>
+      <div class="seg">
+        <label><input type="radio" name="type" value="出発"><span>出発</span></label>
+        <label><input type="radio" name="type" value="到着"><span>到着</span></label>
+        <label><input type="radio" name="type" value="終了"><span>終了</span></label>
+      </div>
+      <div id="fFromWrap"><label for="fFrom">出発地</label><input id="fFrom" autocomplete="off"></div>
+      <label for="fPlace" id="fPlaceLabel">行き先</label><input id="fPlace" autocomplete="off">
+      <div id="fCatWrap">
+        <label>区分</label>
+        <div class="seg">
+          <label><input type="radio" name="cat" value="私用"><span>私用</span></label>
+          <label><input type="radio" name="cat" value="業務"><span>業務</span></label>
+        </div>
+        <label for="fPurpose">目的</label><input id="fPurpose" autocomplete="off">
+      </div>
+      <label for="fKm">メーターのキロ数（言った数字。補正は自動で足します）</label>
+      <input id="fKm" inputmode="numeric" autocomplete="off">
+      <div class="muted" id="fKmNote"></div>
+      <div class="actions">
+        <button class="btn" type="button" id="fCancel">やめる</button>
+        <button class="btn primary" type="submit">記録する</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="editCard" hidden>
+    <div class="state-title" id="eTitle">記録を直す</div>
+    <div class="muted" id="eSaid"></div>
+    <form id="eForm">
+      <div style="display:grid;grid-template-columns:3fr 2fr;gap:8px">
+        <div><label for="eDate">日付</label><input id="eDate" type="date"></div>
+        <div><label for="eTime">時刻</label><input id="eTime" type="time"></div>
+      </div>
+      <label for="eFrom">出発地</label><input id="eFrom" autocomplete="off">
+      <label for="ePlace" id="ePlaceLabel">行き先・場所</label><input id="ePlace" autocomplete="off">
+      <label>区分（この運行全体が変わります）</label>
+      <div class="seg">
+        <label><input type="radio" name="eCat" value="私用"><span>私用</span></label>
+        <label><input type="radio" name="eCat" value="業務"><span>業務</span></label>
+      </div>
+      <label for="ePurpose">目的（この運行全体が変わります）</label><input id="ePurpose" autocomplete="off">
+      <label for="eKm">メーター（km）</label><input id="eKm" inputmode="numeric" autocomplete="off">
+      <div class="muted" id="eNote">区間と合計の km は自動で計算し直します</div>
+      <div class="actions">
+        <button class="btn" type="button" id="eCancel">やめる</button>
+        <button class="btn primary" type="submit">直す</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="tripCard" hidden>
+    <div class="state-title" id="tTitle">運行の詳細</div>
+    <div class="muted" id="tDetail"></div>
+    <ul class="list" id="tLogs" style="margin-top:8px"></ul>
+    <div class="actions"><button class="btn" type="button" id="tClose">閉じる</button></div>
+  </section>
+
+  <section class="card">
+    <div class="month-nav">
+      <button class="btn" type="button" id="mPrev" aria-label="前の月">‹</button>
+      <b id="mTitle"></b>
+      <button class="btn" type="button" id="mNext" aria-label="次の月">›</button>
+    </div>
+    <div class="sum">
+      <div><span class="muted">業務</span><b class="km" id="sumBiz">0</b><span class="muted">km</span></div>
+      <div><span class="muted">私用</span><b class="km" id="sumPri">0</b><span class="muted">km</span></div>
+      <div><span class="muted">業務の割合</span><b id="sumRate">—</b></div>
+    </div>
+    <div class="muted" id="mCount" style="text-align:center;margin-top:6px"></div>
+    <div id="mBreakWrap">
+      <div class="sub-title">目的ごと</div>
+      <table class="breakdown" id="mBreak"></table>
+    </div>
+    <div class="sub-title">運行の一覧（押すと詳細・修正）</div>
+    <ul class="list" id="mTrips"></ul>
+  </section>
+
+  <section class="card">
+    <div class="label">最近の記録（押すと修正）</div>
+    <ul class="list" id="history"></ul>
+    <div class="pending" id="pendingNote" hidden></div>
+  </section>
+
+  <section class="card" id="settingsCard" hidden>
+    <div class="state-title">設定</div>
+    <label for="sUrl" class="label">スプレッドシートの受付URL（Apps Script の …/exec）</label>
+    <input id="sUrl" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+    <label for="sOffset" class="label">メーターの補正（言った数字に足す）</label>
+    <input id="sOffset" inputmode="numeric">
+    <label for="sHome" class="label">ふだんの出発地</label>
+    <input id="sHome" autocomplete="off">
+    <label class="label" style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <input type="checkbox" id="sVoice" style="width:auto"> 記録したら声で知らせる
+    </label>
+    <div class="actions">
+      <button class="btn" type="button" id="sClose">閉じる</button>
+      <button class="btn primary" type="button" id="sSave">保存</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"><span id="toastText"></span><button type="button" id="undoBtn">取り消す</button></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  // ---- 保存（このスマホの中） ----
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('unko.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('unko.' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  // URLの #url=… で受付URLを一度だけ渡せるようにする（ページ本体には書かない）
+  const hashUrl = new URLSearchParams(location.hash.slice(1)).get('url');
+  if (hashUrl) { store.set('url', hashUrl); history.replaceState(null, '', location.pathname); }
+
+  const settings = Object.assign({ url: '', offset: 100000, home: '自宅', voice: true },
+    { url: store.get('url', ''), offset: store.get('offset', 100000), home: store.get('home', '自宅'), voice: store.get('voice', true) });
+
+  // trip: { id, date, startTime, from, cat, purpose, startKm, lastKm, lastPlace, places[], driving }
+  let trip = store.get('trip', null);
+  let logs = store.get('logs', []);       // 画面に出す最近の記録
+  let trips = store.get('trips', []);     // 終了した運行（今月の集計用）
+  let queue = store.get('queue', []);     // まだ送れていない記録
+  let lastAction = null;                  // 取り消し用
+
+  // ---- 日付・数字 ----
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = d => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+  const timeStr = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const fmt = n => Number(n).toLocaleString('ja-JP');
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  // 漢数字（二千百四十五 など）を数字に
+  function kanjiToNum(s) {
+    const d = { '〇': 0, '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9 };
+    const u = { '十': 10, '百': 100, '千': 1000 };
+    let total = 0, sect = 0, cur = 0, digits = '';
+    for (const c of s) {
+      if (c in d) { cur = d[c]; digits += d[c]; }
+      else if (c in u) { sect += (cur || 1) * u[c]; cur = 0; digits = null; }
+      else if (c === '万') { total += (sect + cur) * 10000; sect = 0; cur = 0; digits = null; }
+    }
+    if (digits !== null && digits.length > 1) return Number(digits); // 二一四五 のような読み
+    return total + sect + cur;
+  }
+  function normalize(t) {
+    return t.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/(\d)[,，、](?=\d{3})/g, '$1')
+      .replace(/[〇零一二三四五六七八九十百千万]{2,}|[〇零一二三四五六七八九][十百千万]?/g, m => /[百千万]|.{3,}/.test(m) ? String(kanjiToNum(m)) : m)
+      .replace(/\s+/g, '');
+  }
+
+  // ---- 話した言葉を読み取る ----
+  const TYPE_WORDS = [
+    ['終了', /終了|終わり|おわり|おしまい|帰着|帰宅/],
+    ['到着', /到着|着きました|着いた|つきました/],
+    ['出発', /出発|出ます|出かけ|行きます|向かいます|いってきます|行ってきます/],
+  ];
+  const FILLER = /^(今から|これから|ただいま|只今|今|では|じゃあ|はい|えー|えっと)+/;
+
+  function parse(raw) {
+    const t = normalize(raw);
+    const r = { type: '', from: '', place: '', cat: '', purpose: '', km: null };
+    for (const [name, re] of TYPE_WORDS) if (re.test(t)) { r.type = name; break; }
+
+    // キロ数：「キロ」「km」の前の数字、なければ3桁以上の最後の数字
+    const withUnit = [...t.matchAll(/(\d{2,7})(?:キロ|km|ｋｍ|㎞)/gi)];
+    const anyNum = [...t.matchAll(/\d{3,7}/g)];
+    if (withUnit.length) r.km = Number(withUnit[withUnit.length - 1][1]);
+    else if (anyNum.length) r.km = Number(anyNum[anyNum.length - 1][0]);
+
+    if (/私用|プライベート|個人/.test(t)) r.cat = '私用';
+    else if (/業務|仕事|会社|公用|営業|出張/.test(t)) r.cat = '業務';
+
+    const purposes = [];
+    const segs = t.split(/です|でした|します|しました|ました|ます|[。、,.!！?？]/).map(s => s.replace(FILLER, '')).filter(Boolean);
+    for (let s of segs) {
+      if (/\d|キロ|メーター|距離/.test(s)) continue;
+      const typeHit = TYPE_WORDS.find(([, re]) => re.test(s));
+      if (typeHit) {
+        let p = s.replace(/(に|へ|まで)?(向けて)?(出発|到着|着き|着い|つき|行き|向かい|終了|終わり|帰着|帰宅|出かけ|出|いってき|行ってき).*$/, '');
+        p = p.replace(FILLER, '');
+        const m = p.match(/^(.*?)から(.*)$/);
+        if (m) { r.from = m[1]; p = m[2]; }
+        if (p && !/^(い|今|は|を)$/.test(p)) r.place = p.replace(/(に|へ|まで)$/, '');
+        continue;
+      }
+      s = s.replace(/^(区分は|目的は)/, '');
+      if (/^(私用|プライベート|個人|業務|仕事|公用)(で|の)?$/.test(s)) continue;
+      s = s.replace(/^(私用|プライベート|個人用?|業務|仕事)(で|の)/, '');
+      s = s.replace(/(のため|のために|で)$/, '');
+      if (s && s.length <= 30) purposes.push(s);
+    }
+    r.purpose = purposes.join('・');
+    return r;
+  }
+
+  // ---- 状態の表示 ----
+  function render() {
+    if (!trip) {
+      $('stateTitle').textContent = '待機中';
+      $('stateDetail').textContent = '出発するときにマイクを押して話してください';
+    } else {
+      const route = [trip.from, ...trip.places].filter(Boolean).join(' → ');
+      $('stateTitle').textContent = trip.driving ? `運行中：${trip.dest || '行き先未定'}へ` : `${trip.lastPlace || '到着地'}に停車中`;
+      $('stateDetail').innerHTML =
+        `${trip.date} ${trip.startTime} 出発（${trip.cat || '区分未定'}${trip.purpose ? '・' + esc(trip.purpose) : ''}）<br>` +
+        `${esc(route)}<br>開始 <span class="km">${fmt(trip.startKm)}</span> km ／ 直近 <span class="km">${fmt(trip.lastKm)}</span> km` +
+        `<br>ここまで <b class="km">${fmt(trip.lastKm - trip.startKm)}</b> km`;
+    }
+    $('history').innerHTML = sortLogs(logs).slice(-12).reverse().map(logItem).join('') || '<li class="muted">まだありません</li>';
+    renderMonth();
+
+    $('pendingNote').hidden = !queue.length && settings.url;
+    $('pendingNote').textContent = !settings.url
+      ? '受付URLが未設定のため、記録はこのスマホの中だけにあります（設定から入れてください）'
+      : `未送信 ${queue.length} 件（電波が戻ったら自動で送ります）`;
+  }
+  const logItem = l =>
+    `<li class="tap" data-log="${esc(l['記録ID'])}"><div><span class="tag t-${l['種類']}">${l['種類']}</span>${String(l['日付']).slice(5)} ${l['時刻']}　${esc(l['行き先・場所'] || '')}` +
+    ` <span class="muted km">${fmt(l['メーター(km)'])}km${l['区間km'] !== '' ? '（区間 ' + l['区間km'] + 'km）' : ''}</span></div></li>`;
+  const sortLogs = arr => arr.map((l, i) => [l, i])
+    .sort((a, b) => (String(a[0]['日付']) + a[0]['時刻']).localeCompare(String(b[0]['日付']) + b[0]['時刻']) || a[1] - b[1])
+    .map(x => x[0]);
+
+  // ---- 月ごとの集計 ----
+  let viewMonth = dateStr(new Date()).slice(0, 7);
+  const shiftMonth = (ym, n) => { const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1); return dateStr(d).slice(0, 7); };
+  function renderMonth() {
+    $('mTitle').textContent = `${viewMonth.slice(0, 4)}年${Number(viewMonth.slice(5))}月`;
+    const list = trips.filter(x => String(x['日付']).slice(0, 7) === viewMonth)
+      .sort((a, b) => (a['日付'] + a['出発時刻']).localeCompare(b['日付'] + b['出発時刻']));
+    let biz = 0, pri = 0;
+    const by = {};
+    list.forEach(x => {
+      const km = Number(x['走行km']) || 0;
+      if (x['区分'] === '業務') biz += km; else pri += km;
+      const k = `${x['区分'] || '区分なし'}｜${x['目的'] || '目的なし'}`;
+      by[k] = by[k] || { km: 0, n: 0 }; by[k].km += km; by[k].n++;
+    });
+    $('sumBiz').textContent = fmt(biz);
+    $('sumPri').textContent = fmt(pri);
+    $('sumRate').textContent = biz + pri ? Math.round(biz / (biz + pri) * 100) + '%' : '—';
+    $('mCount').textContent = list.length ? `運行 ${list.length} 回・合計 ${fmt(biz + pri)} km` : 'この月の運行はありません';
+    $('mBreakWrap').hidden = !list.length;
+    $('mBreak').innerHTML = Object.entries(by).sort((a, b) => b[1].km - a[1].km).map(([k, v]) =>
+      `<tr><td>${esc(k.replace('｜', '・'))}（${v.n}回）</td><td>${fmt(v.km)} km</td></tr>`).join('');
+    $('mTrips').innerHTML = list.slice().reverse().map(x =>
+      `<li class="tap trip" data-trip="${esc(x['運行ID'])}"><div>${String(x['日付']).slice(5)} ${x['出発時刻']}–${x['終了時刻']}　` +
+      `<b>${esc(x['区分'])}</b> ${esc(x['目的'])}<br><span class="muted">${esc([x['出発地'], x['行き先（経由）']].filter(Boolean).join(' → '))}</span>` +
+      ` <b class="km">${fmt(x['走行km'])}km</b></div></li>`).join('');
+  }
+  $('mPrev').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, -1); renderMonth(); });
+  $('mNext').addEventListener('click', () => { viewMonth = shiftMonth(viewMonth, 1); renderMonth(); });
+
+  // ---- 記録を直す ----
+  // 運行の記録を日時の順に並べ、区間km・累計km と運行の行を計算し直す（GAS の recompute_ と同じ計算）
+  function recomputeTrip(tripId) {
+    const ls = sortLogs(logs.filter(l => l['運行ID'] === tripId));
+    if (!ls.length || ls[0]['種類'] !== '出発') return;  // 手元に運行の最初がないときはスプレッドシート側に任せる
+    const start = Number(ls[0]['メーター(km)']);
+    let prev = start;
+    ls.forEach((l, i) => {
+      const km = Number(l['メーター(km)']);
+      l['区間km'] = i === 0 || l['種類'] === '出発' ? '' : km - prev;
+      l['運行の累計km'] = km - start;
+      prev = km;
+    });
+    const first = ls[0], last = ls[ls.length - 1];
+    const places = routeOf(ls);
+    const t = trips.find(x => x['運行ID'] === tripId);
+    if (t) Object.assign(t, { '日付': first['日付'], '出発時刻': first['時刻'], '終了時刻': last['時刻'], '出発地': first['出発地'],
+      '行き先（経由）': places.join(' → '), '区分': first['区分'], '目的': first['目的'],
+      '開始メーター': start, '終了メーター': prev, '走行km': prev - start });
+    if (trip && trip.id === tripId) Object.assign(trip, {
+      date: first['日付'], startTime: first['時刻'], from: first['出発地'], cat: first['区分'], purpose: first['目的'],
+      startKm: start, lastKm: prev, places,
+      lastPlace: last['種類'] === '出発' ? last['出発地'] : last['行き先・場所'],
+      dest: last['種類'] === '出発' ? last['行き先・場所'] : '' });
+  }
+
+  // 経由地：到着・終了の場所。到着を言わずに終了した区間は、出発で言った行き先も入れる
+  function routeOf(ls) {
+    const out = [];
+    ls.forEach((l, i) => {
+      const next = ls[i + 1];
+      const p = l['行き先・場所'];
+      if (l['種類'] !== '出発') { if (p) out.push(p); }
+      else if (p && next && next['種類'] === '終了' && next['行き先・場所'] !== p) out.push(p);
+    });
+    return out;
+  }
+
+  let editing = null;
+  function openEdit(logId) {
+    const l = logs.find(x => x['記録ID'] === logId);
+    if (!l) return;
+    editing = l;
+    $('eTitle').textContent = `${l['種類']}の記録を直す`;
+    $('eSaid').textContent = l['発言'] && l['発言'] !== '（手入力）' ? '話した言葉：「' + l['発言'] + '」' : '';
+    $('eDate').value = String(l['日付']).replace(/\//g, '-');
+    $('eTime').value = l['時刻'];
+    $('eFrom').value = l['出発地'] || '';
+    $('ePlace').value = l['行き先・場所'] || '';
+    $('ePlaceLabel').textContent = l['種類'] === '出発' ? '行き先' : '到着した場所';
+    document.querySelectorAll('input[name=eCat]').forEach(i => { i.checked = i.value === l['区分']; });
+    $('ePurpose').value = l['目的'] || '';
+    $('eKm').value = l['メーター(km)'];
+    $('eNote').textContent = '区間と合計の km は自動で計算し直します';
+    $('eNote').className = 'muted';
+    $('editCard').hidden = false;
+    $('editCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('eCancel').addEventListener('click', () => { $('editCard').hidden = true; editing = null; });
+  $('eForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const l = editing;
+    if (!l) return;
+    const kmIn = Number(normalize($('eKm').value));
+    if (!$('eKm').value.trim() || isNaN(kmIn) || !$('eDate').value || !$('eTime').value) {
+      $('eNote').textContent = '日付・時刻・メーターを入れてください'; $('eNote').className = 'pending'; return;
+    }
+    const next = {
+      '日付': $('eDate').value.replace(/-/g, '/'), '時刻': $('eTime').value,
+      '出発地': $('eFrom').value.trim(), '行き先・場所': $('ePlace').value.trim(),
+      '区分': (document.querySelector('input[name=eCat]:checked') || {}).value || '',
+      '目的': $('ePurpose').value.trim(), 'メーター(km)': withOffset(kmIn),
+    };
+    const changes = {};
+    Object.keys(next).forEach(k => { if (String(next[k]) !== String(l[k] == null ? '' : l[k])) changes[k] = next[k]; });
+    $('editCard').hidden = true; editing = null;
+    if (!Object.keys(changes).length) { toast('変更はありませんでした', false); return; }
+
+    Object.assign(l, changes);
+    ['区分', '目的'].forEach(h => {
+      if (h in changes) logs.filter(x => x['運行ID'] === l['運行ID']).forEach(x => { x[h] = changes[h]; });
+    });
+    recomputeTrip(l['運行ID']);
+    queue.push({ action: 'edit', logId: l['記録ID'], tripId: l['運行ID'], changes });
+    lastAction = null;
+    save(); render(); flush();
+    if (!$('tripCard').hidden) openTrip(l['運行ID']);
+    toast('直しました', false);
+  });
+
+  // ---- 運行の詳細 ----
+  async function openTrip(tripId) {
+    const t = trips.find(x => x['運行ID'] === tripId);
+    $('tripCard').hidden = false;
+    $('tTitle').textContent = t ? `${t['日付']}　${t['区分']} ${t['目的']}` : '運行の詳細';
+    $('tDetail').textContent = t ? `${t['出発地']} → ${t['行き先（経由）']}　${fmt(t['開始メーター'])} → ${fmt(t['終了メーター'])} km（${fmt(t['走行km'])} km）` : '';
+    const show = () => { $('tLogs').innerHTML = sortLogs(logs.filter(l => l['運行ID'] === tripId)).map(logItem).join('') || '<li class="muted">読み込み中…</li>'; };
+    show();
+    $('tripCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 古い運行は手元にないので、スプレッドシートから読む
+    if (settings.url && navigator.onLine && !queue.length) {
+      try {
+        const j = await (await fetch(settings.url + '?trip=' + encodeURIComponent(tripId))).json();
+        if (j.ok && j.logs.length) {
+          logs = logs.filter(l => l['運行ID'] !== tripId).concat(j.logs);
+          show();
+        }
+      } catch (e) {}
+    }
+  }
+  $('tClose').addEventListener('click', () => { $('tripCard').hidden = true; });
+  document.addEventListener('click', e => {
+    const li = e.target.closest('li[data-log], li[data-trip]');
+    if (!li) return;
+    if (li.dataset.log) openEdit(li.dataset.log); else openTrip(li.dataset.trip);
+  });
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function save() { store.set('trip', trip); store.set('logs', sortLogs(logs).slice(-80)); store.set('trips', trips.slice(-300)); store.set('queue', queue); }
+
+  // ---- スプレッドシートへ送る ----
+  async function flush() {
+    if (!settings.url || !queue.length || !navigator.onLine) { render(); return; }
+    while (queue.length) {
+      try {
+        const res = await fetch(settings.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(queue[0]) });
+        const j = await res.json();
+        if (!j.ok) throw new Error(j.error);
+        queue.shift(); save();
+      } catch (e) { break; }
+    }
+    render();
+  }
+  async function pull() {
+    if (!settings.url || !navigator.onLine) return;
+    try {
+      const j = await (await fetch(settings.url)).json();
+      if (!j.ok) return;
+      const pendLogs = queue.filter(q => q.action === 'log').map(q => q.row);
+      const pendTrips = queue.filter(q => q.action === 'trip').map(q => q.row);
+      logs = j.logs.concat(pendLogs);
+      trips = j.trips.concat(pendTrips);
+      save(); render();
+    } catch (e) {}
+  }
+
+  // ---- 記録する ----
+  const withOffset = km => (km < settings.offset ? km + Number(settings.offset) : km);
+
+  function commit(r, said) {
+    const now = new Date();
+    const km = withOffset(r.km);
+    const before = JSON.parse(JSON.stringify(trip));
+    const log = { '記録ID': newId(), '日付': dateStr(now), '時刻': timeStr(now), '種類': r.type, '発言': said || '（手入力）' };
+    let tripRow = null;
+
+    if (r.type === '出発') {
+      if (!trip) {
+        trip = { id: 'T' + newId(), date: dateStr(now), startTime: timeStr(now), from: r.from || settings.home,
+          dest: r.place, cat: r.cat, purpose: r.purpose, startKm: km, lastKm: km, lastPlace: r.from || settings.home, places: [], driving: true };
+      } else {
+        // 停車中からの再出発
+        trip.dest = r.place || trip.dest;
+        if (r.cat) trip.cat = r.cat;
+        if (r.purpose && !trip.purpose.includes(r.purpose)) trip.purpose = [trip.purpose, r.purpose].filter(Boolean).join('・');
+        trip.lastKm = km; trip.driving = true;
+      }
+      Object.assign(log, { '出発地': trip.lastPlace, '行き先・場所': r.place || trip.dest || '', '区間km': '' });
+    } else {
+      const place = r.place || (r.type === '到着' ? trip.dest : settings.home) || '';
+      const leg = km - trip.lastKm;
+      // 到着を言わずに終了したときも、出発で言った行き先を経由地に残す
+      if (r.type === '終了' && trip.driving && trip.dest && trip.dest !== place) trip.places.push(trip.dest);
+      Object.assign(log, { '出発地': trip.lastPlace, '行き先・場所': place, '区間km': leg });
+      if (place) trip.places.push(place);
+      trip.lastKm = km; trip.lastPlace = place; trip.driving = false; trip.dest = '';
+      if (r.cat) trip.cat = r.cat;
+      if (r.purpose) trip.purpose = [trip.purpose, r.purpose].filter(Boolean).join('・');
+    }
+    Object.assign(log, { '運行ID': trip.id, '区分': trip.cat || '', '目的': trip.purpose || '',
+      'メーター(km)': km, '運行の累計km': km - trip.startKm });
+
+    if (r.type === '終了') {
+      tripRow = { '運行ID': trip.id, '日付': trip.date, '出発時刻': trip.startTime, '終了時刻': timeStr(now),
+        '出発地': trip.from, '行き先（経由）': trip.places.join(' → '), '区分': trip.cat || '', '目的': trip.purpose || '',
+        '開始メーター': trip.startKm, '終了メーター': km, '走行km': km - trip.startKm };
+      trips.push(tripRow);
+      trip = null;
+    }
+    logs.push(log);
+    queue.push({ action: 'log', row: log });
+    if (tripRow) queue.push({ action: 'trip', row: tripRow });
+    lastAction = { before, log, tripRow };
+    save(); render(); flush();
+
+    const msg = r.type === '出発' ? `出発を記録しました。${fmt(km)}キロ`
+      : r.type === '到着' ? `到着を記録しました。区間${log['区間km']}キロ`
+      : `終了しました。今回の走行は${tripRow['走行km']}キロです`;
+    toast(msg);
+    speak(msg);
+  }
+
+  function undo() {
+    if (!lastAction) return;
+    const { before, log, tripRow } = lastAction;
+    trip = before;
+    logs = logs.filter(l => l['記録ID'] !== log['記録ID']);
+    if (tripRow) trips = trips.filter(t => t['運行ID'] !== tripRow['運行ID']);
+    const inQueue = queue.length;
+    queue = queue.filter(q => !(q.row['記録ID'] === log['記録ID'] || (tripRow && q.action === 'trip' && q.row['運行ID'] === tripRow['運行ID'])));
+    if (queue.length === inQueue - (tripRow ? 2 : 1)) { /* まだ送っていなかった */ }
+    else queue.push({ action: 'undo', logId: log['記録ID'], tripId: tripRow ? tripRow['運行ID'] : '' });
+    lastAction = null;
+    save(); render(); flush();
+    toast('取り消しました', false);
+  }
+
+  // ---- 確認フォーム ----
+  function problems(r) {
+    if (!r.type) return '「出発」「到着」「終了」のどれかが聞き取れませんでした';
+    if (r.type !== '出発' && !trip) return 'まだ出発していません';
+    if (r.type === '出発' && trip && trip.driving) return '運行中です。先に「到着」か「終了」を記録してください';
+    if (r.km == null || isNaN(r.km)) return 'キロ数が聞き取れませんでした';
+    const km = withOffset(r.km);
+    if (trip && km < trip.lastKm) return `キロ数が前回（${fmt(trip.lastKm)}km）より小さくなっています`;
+    if (trip && km - trip.lastKm > 1000) return `前回から${fmt(km - trip.lastKm)}km 増えています。数字を確かめてください`;
+    return '';
+  }
+
+  function openForm(r, said, note) {
+    $('formCard').hidden = false;
+    $('formCard').dataset.said = said || '';
+    $('formTitle').textContent = note ? '確認してください' : '記録の内容';
+    document.querySelectorAll('input[name=type]').forEach(i => { i.checked = i.value === r.type; });
+    document.querySelectorAll('input[name=cat]').forEach(i => { i.checked = i.value === (r.cat || (trip && trip.cat) || ''); });
+    $('fFrom').value = r.from || (trip ? trip.lastPlace : settings.home);
+    $('fPlace').value = r.place || '';
+    $('fPurpose').value = r.purpose || '';
+    $('fKm').value = r.km != null ? r.km : '';
+    $('fKmNote').textContent = note || '';
+    $('fKmNote').className = note ? 'pending' : 'muted';
+    syncForm();
+    $('formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function syncForm() {
+    const type = (document.querySelector('input[name=type]:checked') || {}).value;
+    $('fFromWrap').hidden = !(type === '出発' && !trip);
+    $('fCatWrap').hidden = type !== '出発';
+    $('fPlaceLabel').textContent = type === '出発' ? '行き先' : type === '到着' ? '到着した場所' : '終了した場所（空なら ふだんの出発地）';
+  }
+  document.querySelectorAll('input[name=type]').forEach(i => i.addEventListener('change', syncForm));
+  $('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const r = {
+      type: (document.querySelector('input[name=type]:checked') || {}).value || '',
+      cat: (document.querySelector('input[name=cat]:checked') || {}).value || '',
+      from: $('fFrom').value.trim(), place: $('fPlace').value.trim(), purpose: $('fPurpose').value.trim(),
+      km: $('fKm').value.trim() === '' ? null : Number(normalize($('fKm').value)),
+    };
+    const p = problems(r);
+    if (p) { $('fKmNote').textContent = p; $('fKmNote').className = 'pending'; return; }
+    $('formCard').hidden = true;
+    commit(r, $('formCard').dataset.said);
+  });
+  $('fCancel').addEventListener('click', () => { $('formCard').hidden = true; });
+  document.querySelectorAll('[data-manual]').forEach(b => b.addEventListener('click', () =>
+    openForm({ type: b.dataset.manual, km: null }, '', '')));
+
+  // ---- 音声 ----
+  function handleSpeech(text) {
+    $('heard').textContent = '「' + text + '」';
+    const r = parse(text);
+    const p = problems(r);
+    // 出発は区分も必要。足りなければ確認フォームへ
+    if (p || (r.type === '出発' && !trip && !r.cat)) {
+      openForm(r, text, p || '私用か業務かを選んでください');
+      speak(p || '私用か業務かを選んでください');
+      return;
+    }
+    $('formCard').hidden = true;
+    commit(r, text);
+  }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null;
+  if (!SR) {
+    $('mic').disabled = true;
+    $('mic').textContent = 'このブラウザは音声入力に未対応';
+    $('micHint').textContent = 'Android の Chrome で開いてください。下の「手で入力する」も使えます。';
+  }
+  $('mic').addEventListener('click', () => {
+    if (rec) { rec.stop(); return; }
+    rec = new SR();
+    rec.lang = 'ja-JP';
+    rec.interimResults = true;
+    rec.continuous = false;
+    let finalText = '';
+    rec.onresult = ev => {
+      let interim = '';
+      for (const res of ev.results) { if (res.isFinal) finalText = res[0].transcript; else interim += res[0].transcript; }
+      $('heard').textContent = '「' + (finalText || interim) + '」';
+    };
+    rec.onerror = ev => {
+      $('heard').textContent = ev.error === 'not-allowed' ? 'マイクの使用が許可されていません（ブラウザの設定で許可してください）' :
+        ev.error === 'no-speech' ? '聞き取れませんでした。もう一度どうぞ' : '音声入力のエラー：' + ev.error;
+    };
+    rec.onend = () => {
+      rec = null;
+      $('mic').classList.remove('listening');
+      $('mic').textContent = '🎤 押して話す';
+      if (finalText) handleSpeech(finalText);
+    };
+    $('mic').classList.add('listening');
+    $('mic').textContent = '● 聞いています（もう一度押すと終わり）';
+    $('heard').textContent = '';
+    try { speechSynthesis.cancel(); } catch (e) {}
+    rec.start();
+  });
+
+  function speak(text) {
+    if (!settings.voice || !window.speechSynthesis) return;
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'ja-JP'; speechSynthesis.speak(u); } catch (e) {}
+  }
+  let toastTimer = null;
+  function toast(text, canUndo = true) {
+    $('toastText').textContent = text;
+    $('undoBtn').hidden = !canUndo;
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('toast').classList.remove('show'), canUndo ? 10000 : 2500);
+  }
+  $('undoBtn').addEventListener('click', () => { $('toast').classList.remove('show'); undo(); });
+
+  // ---- 設定 ----
+  $('openSettings').addEventListener('click', () => {
+    $('sUrl').value = settings.url; $('sOffset').value = settings.offset; $('sHome').value = settings.home; $('sVoice').checked = settings.voice;
+    $('settingsCard').hidden = false; $('settingsCard').scrollIntoView({ behavior: 'smooth' });
+  });
+  $('sClose').addEventListener('click', () => { $('settingsCard').hidden = true; });
+  $('sSave').addEventListener('click', () => {
+    settings.url = $('sUrl').value.trim(); settings.offset = Number($('sOffset').value) || 0;
+    settings.home = $('sHome').value.trim() || '自宅'; settings.voice = $('sVoice').checked;
+    ['url', 'offset', 'home', 'voice'].forEach(k => store.set(k, settings[k]));
+    $('settingsCard').hidden = true; toast('設定を保存しました', false);
+    pull().then(flush);
+  });
+
+  window.addEventListener('online', flush);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  window.__unko = { parse, handleSpeech };  // 動作確認用
+  render();
+  flush().then(pull);
+})();
+</script>
+</body>
+</html>
